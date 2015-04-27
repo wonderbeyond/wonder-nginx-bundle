@@ -1,0 +1,85 @@
+http {
+    # ... ...
+
+    lua_package_path  "/home/wonder/lab/wonder-nginx-bundle/bundle/lua-resty-redis-0.20/lib/?.lua;;";
+    lua_package_cpath "/home/wonder/lab/wonder-nginx-bundle/bundle/lua-cjson-2.1.0/?.so;;";
+
+    server {
+        listen       80;
+        server_name  localhost;
+
+        location ~ ^/update(/.*)$ {
+            proxy_pass http://127.0.0.1:8000$1$is_args$args;
+        }
+
+        location /api/ {
+            # set expire timeout, in seconds
+            set $cache_timeout 3600;
+            content_by_lua '
+                -- TODO: support vary on specified header
+                local cjson = require "cjson"
+
+                local update_url = "/update" .. ngx.var.request_uri
+
+                local redis = require "resty.redis"
+                local red = redis:new()
+                red:set_timeout(1000)
+
+                local ok, err = red:connect("127.0.0.1", 6379)
+                if not ok then
+                    ngx.say("Failed to connect: ", err)
+                    return
+                end
+
+                -- try get content from redis
+                local key = ngx.var.request_uri
+                local cache, err = red:hmget(key, "header", "body")
+
+                if not cache then
+                    -- fetch error
+                    ngx.say("Failed to get ", key , err)
+                    return
+                end
+
+                if cache ~= ngx.null and cache[1] ~= ngx.null then
+                    -- hit cache
+                    ngx.header.X_From_Page_Cache = "true"
+                    local header, body = cjson.decode(cache[1]), cache[2]
+                    ngx.header["Content-Type"] = header["Content-Type"]
+                    ngx.say(body)
+                    ngx.eof()
+                else
+                    -- fetch from upstream
+                    ngx.log(ngx.INFO, key, " not exists")
+                    local res = ngx.location.capture(update_url)
+
+                    -- response to client & update data to cache
+                    ngx.status = res.status
+                    for k, v in pairs(res.header) do
+                        ngx.header[k] = v
+                    end
+                    ngx.say(res.body)
+                    ngx.eof()
+
+                    if res.status == 200 then
+                        -- NOTE: json encode&decode leads to much performance loss
+                        red:hmset(key, "header", cjson.encode(res.header), "body", res.body)
+                        local cache_timeout = ngx.var.cache_timeout
+                        red:expire(key, cache_timeout ~= nil and cache_timeout or 60*60)
+                    end
+                end
+
+                -- Puts the connection into connection pool
+                -- This gets about 30% performance boost(tested by wonder)
+                local ok, err = red:set_keepalive(1000*60*60, 10)
+                if not ok then
+                    ngx.log(ngx.EMERG, "Faied to keepalive", err)
+                end
+            ';
+        }
+    }
+
+    # ...
+}
+
+

@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+PREFIX=/usr/local/nginx-bundle
+LUAJIT_PREFIX=${PREFIX}/luajit
+NGINX_PREFIX=${PREFIX}/nginx
+
+JOBS=6
+
+ROOT_DIR=`pwd`
+BUNDLE_DIR=${ROOT_DIR}/bundle
+
+# build&install LuaJIT:
+cd $ROOT_DIR/bundle/LuaJIT-2.1-20150223/
+echo make -j${JOBS} PREFIX=${LUAJIT_PREFIX} && sudo make install PREFIX=${LUAJIT_PREFIX}
+
+# tell nginx's build system where to find LuaJIT 2.1:
+export LUAJIT_LIB=${LUAJIT_PREFIX}/lib
+export LUAJIT_INC=${LUAJIT_PREFIX}/include/luajit-2.1
+
+# build nginx with modules
+cd $ROOT_DIR/bundle/nginx-1.7.12
+./configure --prefix=${NGINX_PREFIX} \
+    --with-ld-opt="-Wl,-rpath,${LUAJIT_LIB-$LUA_LIB}" \
+    --add-module=${BUNDLE_DIR}/ngx_devel_kit-0.2.19\
+    --add-module=${BUNDLE_DIR}/lua-nginx-module-0.9.16rc1
+make -j${JOBS} && sudo make install
+
+# install lua libs
+cd $ROOT_DIR/bundle/lua-cjson-2.1.0/
+make PREFIX=${LUAJIT_PREFIX} LUA_INCLUDE_DIR=${LUAJIT_PREFIX}/include/luajit-2.1
