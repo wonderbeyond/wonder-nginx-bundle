@@ -21,6 +21,7 @@ export LUAJIT_INC=${LUAJIT_PREFIX}/include/luajit-2.1
 cd $ROOT_DIR/bundle/nginx-1.7.12
 ./configure --prefix=${NGINX_PREFIX} \
     --with-ld-opt="-Wl,-rpath,${LUAJIT_LIB-$LUA_LIB}" \
+    --add-module=${BUNDLE_DIR}/echo-nginx-module-0.57 \
     --add-module=${BUNDLE_DIR}/ngx_devel_kit-0.2.19\
     --add-module=${BUNDLE_DIR}/lua-nginx-module-0.9.16rc1
 make -j${JOBS} && sudo make install

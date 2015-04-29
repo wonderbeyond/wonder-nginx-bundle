@@ -14,6 +14,8 @@ Refer to: https://github.com/openresty/lua-nginx-module#installation
 
 - Nginx modules:
 
+    - [echo-nginx-module](https://github.com/openresty/echo-nginx-module/releases/tag/v0.57)
+
     - [ngx_devel_kit](https://github.com/simpl/ngx_devel_kit/releases/tag/v0.2.19)
 
     - [ngx_lua](https://github.com/openresty/lua-nginx-module/releases/tag/v0.9.16rc1)
